@@ -86,3 +86,11 @@ python scripts/build_history.py \
 普鲁斯特问卷是文学性的自我问答传统，不是心理测评量表。报告与历史比对不构成医疗、心理、法律、投资或人事决策依据，也不评价变化的好坏。「主观报告」仅指基于原文的文学性观察，不等于可以脱离原文自由发挥。
 
 版本 1.2.2 · 需 Python 3.8+
+
+## 开发 / 发布
+
+- **版本唯一来源**是仓库根目录的 `version.txt`。发布前改这一处即可，`scripts/package.py` 会把版本同步进 `SKILL.md` 与 `README.md` 再打包，避免三处版本号漂移。
+- 本地打包：`python scripts/package.py`，默认产出 `../proust-questionnaire-<版本>.zip`（zip 内路径为正斜杠，符合开放平台要求）。
+- CI：`.github/workflows/ci.yml` 在 push / PR 时自动跑 `quick_validate.py`（SKILL.md 校验）、`check_js.py`（模板内联 JS 语法）、以及打包并校验 zip 结构。
+- 许可证：MIT（`LICENSE`）。
+

@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Validate SKILL.md (frontmatter, name, description)
+        run: python scripts/quick_validate.py .
+      - name: Check inline JS syntax in templates
+        run: python scripts/check_js.py
+      - name: Build package zip (sync version + forward-slash paths)
+        run: python scripts/package.py --output proust-questionnaire.zip
+      - name: Verify zip structure
+        run: |
+          python - <<'PY'
+          import zipfile
+          n = zipfile.ZipFile("proust-questionnaire.zip").namelist()
+          assert n[0].startswith("proust-questionnaire/"), n[0]
+          assert all("\\" not in x for x in n), "backslash found in zip path"
+          print("zip OK:", len(n), "entries, top:", n[0].split('/')[0])
+          PY
