@@ -7,6 +7,7 @@ Subcommands:
     save     --archive DIR --answers FILE --questions FILE [--label TEXT]
     list     --archive DIR [--json] [--limit N]
     show     --archive DIR --id RECORD_ID
+    delete   --archive DIR --id RECORD_ID
     search   --archive DIR --query TEXT [--json]
     compare  --archive DIR --questions FILE [--a ID] [--b ID]
              [--output FILE] [--md FILE]
@@ -18,11 +19,12 @@ Shared helpers are imported from build_report.py in this same directory.
 import argparse
 import json
 import sys
+import unicodedata
 import uuid
 from datetime import datetime
 from pathlib import Path
 
-from build_report import char_count, extract_keywords, is_answered, load_answers
+from build_report import char_count, dimension_stats, extract_keywords, is_answered, load_answers
 
 ARCHIVE_VERSION = "1.1.0"
 
@@ -34,6 +36,22 @@ def read_json(path: Path):
 def write_json(path: Path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _display_width(text) -> int:
+    return sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in str(text))
+
+
+def _pad(text, width: int) -> str:
+    """按终端显示宽度（中文算 2 列）左对齐填充，超出则截断。"""
+    out, cur = "", 0
+    for ch in str(text):
+        cw = 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+        if cur + cw > width:
+            break
+        out += ch
+        cur += cw
+    return out + " " * max(0, width - cur)
 
 
 def archive_root(path: Path) -> Path:
@@ -122,6 +140,19 @@ def cmd_save(args) -> int:
 
     root = archive_root(Path(args.archive))
     idx = load_index(root)
+
+    # 去重：整份答案与已有记录完全一致时跳过，避免重复归档污染列表（--allow-duplicate 可强制写入）。
+    if not getattr(args, "allow_duplicate", False):
+        def _norm(a):
+            return {k: str(v).strip() for k, v in a.items() if is_answered(str(v))}
+        current = _norm(answers)
+        for existing in all_records(root):
+            if _norm(existing.get("answers", {})) == current:
+                print(f"WARN: identical answers already archived as {existing['id']} "
+                      f"(label={existing.get('label', '')}); skipped. "
+                      f"Use --allow-duplicate to force.", file=sys.stderr)
+                return 0
+
     meta_input = raw.get("meta", {}) if isinstance(raw, dict) else {}
     created = (raw.get("created_at") or meta_input.get("created_at")
                or datetime.now().astimezone().isoformat(timespec="seconds"))
@@ -170,11 +201,14 @@ def cmd_list(args) -> int:
         print("档案库为空。先用 save 归档一份答案。")
         return 0
     print(f"档案库: {root}   共 {len(idx['records'])} 条记录")
-    print(f"{'序号':<5}{'ID':<26}{'日期':<21}{'标签':<18}{'完成度':<9}{'字数':<7}")
+    print(_pad("序号", 5) + _pad("ID", 28) + _pad("日期", 18) + _pad("标签", 16)
+          + _pad("完成度", 9) + _pad("字数", 7))
     for i, r in enumerate(items, 1):
         date_str = str(r.get("created_at", ""))[:16].replace("T", " ")
-        print(f"{i:<5}{r['id']:<26}{date_str:<21}{str(r.get('label',''))[:16]:<18}"
-              f"{str(r.get('answered','?')) + '/' + str(r.get('total','?')):<9}{str(r.get('chars','?')):<7}")
+        print(_pad(i, 5) + _pad(r["id"], 28) + _pad(date_str, 18)
+              + _pad(r.get("label", ""), 16)
+              + _pad(str(r.get("answered", "?")) + "/" + str(r.get("total", "?")), 9)
+              + _pad(r.get("chars", "?"), 7))
     return 0
 
 
@@ -185,6 +219,24 @@ def cmd_show(args) -> int:
         print(f"ERROR: record not found: {args.id}", file=sys.stderr)
         return 1
     print(json.dumps(rec, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_delete(args) -> int:
+    root = archive_root(Path(args.archive))
+    rec = find_record(root, args.id)
+    if rec is None:
+        print(f"ERROR: record not found: {args.id}", file=sys.stderr)
+        return 1
+    rid = rec["id"]
+    fp = root / "records" / (rid + ".json")
+    idx = load_index(root)
+    before = len(idx["records"])
+    idx["records"] = [r for r in idx["records"] if r.get("id") != rid]
+    if fp.exists():
+        fp.unlink()
+    save_index(root, idx)
+    print(f"OK: deleted {rid}  label={rec.get('label', '')}  (records {before} -> {len(idx['records'])})")
     return 0
 
 
@@ -210,15 +262,6 @@ def cmd_search(args) -> int:
         snippet = h["text"].replace("\n", " ")
         print(f"  [{h['id']}] {h['label']}  Q{h['qid']}: {snippet[:80]}")
     return 0
-
-
-def dimension_stats(answers: dict, bank: dict):
-    out = []
-    for d in bank.get("dimensions", []):
-        qs = [q for q in bank.get("questions", []) if q["dimension"] == d["key"]]
-        done = sum(1 for q in qs if is_answered(answers.get(str(q["id"]), "")))
-        out.append({"key": d["key"], "label": d["label"], "done": done, "total": len(qs)})
-    return out
 
 
 def keyword_map(answers: dict, questions: list):
@@ -343,13 +386,34 @@ def cmd_compare(args) -> int:
         print("ERROR: at least two archived records are required for comparison", file=sys.stderr)
         return 1
 
+    ordered = sorted(records, key=lambda r: r.get("created_at", ""))
     if args.a and args.b:
         rec_a, rec_b = find_record(root, args.a), find_record(root, args.b)
         if rec_a is None or rec_b is None:
             print("ERROR: one or both record ids not found", file=sys.stderr)
             return 1
+    elif args.a:
+        # 只给 --a：以指定记录为基准，对照最新一条（避免像旧版那样把 --a 静默忽略）。
+        rec_a = find_record(root, args.a)
+        if rec_a is None:
+            print(f"ERROR: record not found: {args.a}", file=sys.stderr)
+            return 1
+        rec_b = ordered[-1]
+        if rec_b["id"] == rec_a["id"]:
+            print("ERROR: --a points to the latest record; pass --b or an earlier --a", file=sys.stderr)
+            return 1
+    elif args.b:
+        # 只给 --b：以指定记录为对照，基准取时间上紧邻的前一条。
+        rec_b = find_record(root, args.b)
+        if rec_b is None:
+            print(f"ERROR: record not found: {args.b}", file=sys.stderr)
+            return 1
+        pos = next((i for i, r in enumerate(ordered) if r["id"] == rec_b["id"]), None)
+        if pos is None or pos == 0:
+            print("ERROR: --b is the earliest record; there is no earlier record to use as baseline", file=sys.stderr)
+            return 1
+        rec_a = ordered[pos - 1]
     else:
-        ordered = sorted(records, key=lambda r: r.get("created_at", ""))
         rec_a, rec_b = ordered[-2], ordered[-1]
 
     diff = compute_diff(rec_a, rec_b, bank)
@@ -380,6 +444,7 @@ def main() -> int:
     s.add_argument("--answers", required=True)
     s.add_argument("--questions", required=True)
     s.add_argument("--label")
+    s.add_argument("--allow-duplicate", action="store_true")
     s.set_defaults(func=cmd_save)
 
     s = sub.add_parser("list")
@@ -392,6 +457,11 @@ def main() -> int:
     s.add_argument("--archive", required=True)
     s.add_argument("--id", required=True)
     s.set_defaults(func=cmd_show)
+
+    s = sub.add_parser("delete")
+    s.add_argument("--archive", required=True)
+    s.add_argument("--id", required=True)
+    s.set_defaults(func=cmd_delete)
 
     s = sub.add_parser("search")
     s.add_argument("--archive", required=True)

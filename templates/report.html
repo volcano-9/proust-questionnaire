@@ -59,7 +59,23 @@ h1{font-size:30px;margin:10px 0 6px;font-weight:650;line-height:1.3}
 .printbar button{font:13px inherit;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 15px;cursor:pointer;color:var(--muted)}
 .printbar button:hover{border-color:var(--accent);color:var(--accent)}
 @media(max-width:600px){.wrap{padding:20px 13px 60px}.hero,.card{padding:22px 18px}.stats{grid-template-columns:repeat(2,1fr)}.bar-label{flex-basis:88px}.brief-row{grid-template-columns:92px 1fr 80px;gap:8px}}
-@media print{body{background:#fff}.wrap{max-width:100%;padding:0}.printbar{display:none}.hero,.card{border:0;border-radius:0;padding:0 0 20px;margin:0 0 16px;box-shadow:none}.card{page-break-inside:avoid}.dim-block,.qa{page-break-inside:avoid}.disclaimer{background:#fff;border:1px solid var(--line)}}
+@media print{body{background:#fff}.wrap{max-width:100%;padding:0}.printbar{display:none}.hero,.card{border:0;border-radius:0;padding:0 0 20px;margin:0 0 16px;box-shadow:none}.card{page-break-inside:avoid}.dim-block,.qa{page-break-inside:avoid}.disclaimer{background:#fff;border:1px solid var(--line)}.note{background:#fff;border-left:2px solid #c9ced8}}
+@media (prefers-color-scheme: dark){
+  :root{--ink:#e8eaf0;--muted:#9aa1b2;--line:#2c2f3a;--bg:#16181f;--card:#1e2129;--accent:#7c92f0;--accent-soft:#262b40;--warm:#d8a75a;--warm-soft:#2a2419}
+  body{background:var(--bg);color:var(--ink)}
+  .hero,.card{background:var(--card);border-color:var(--line)}
+  .note{background:#2a2419;border-left-color:#7a5a25;color:#d9b981}
+  .stat{background:#23262f;border-color:var(--line)}
+  .bar-track{background:#2c2f3a}
+  .kw{background:var(--accent-soft);color:#aab6f5}
+  .q{color:#b9bfcc}
+  .qa,.brief-row{border-bottom-color:#262a34}
+  .brief-ids{color:#9aa1b2}
+  .disclaimer{background:#1b1e26;color:#9aa1b2}
+  .disclaimer b{color:var(--ink)}
+  .printbar button{background:#1e2129;color:var(--muted)}
+  .muted{color:#7f879a}
+}
 </style>
 </head>
 <body>
@@ -70,7 +86,7 @@ h1{font-size:30px;margin:10px 0 6px;font-weight:650;line-height:1.3}
 <header class="hero">
   <div class="eyebrow">PROUST QUESTIONNAIRE · PORTRAIT REPORT</div>
   <h1>{{TITLE}} · {{REPORT_KIND}}</h1>
-  <p class="meta">生成日期 {{GENERATED_AT}} &nbsp;·&nbsp; 基于 6 个维度、{{TOTAL}} 道问题的实际作答</p>
+  <p class="meta">生成日期 {{GENERATED_AT}} &nbsp;·&nbsp; 基于 {{DIM_COUNT}} 个维度、{{TOTAL}} 道问题的实际作答</p>
   <div class="note">{{NOTE}}</div>
 </header>
 
@@ -81,7 +97,7 @@ h1{font-size:30px;margin:10px 0 6px;font-weight:650;line-height:1.3}
     <div class="stat"><b>{{ANSWERED}}/{{TOTAL}}</b><span>已作答题数</span></div>
     <div class="stat"><b>{{RATE}}%</b><span>完成度</span></div>
     <div class="stat"><b>{{CHAR_COUNT}}</b><span>答案总字数</span></div>
-    <div class="stat"><b>6</b><span>覆盖维度</span></div>
+    <div class="stat"><b>{{DIM_COUNT}}</b><span>覆盖维度</span></div>
   </div>
   <div style="margin-top:26px">
     <h2 style="font-size:15px;margin-bottom:12px">各维度作答分布</h2>

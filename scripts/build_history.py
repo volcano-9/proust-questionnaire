@@ -12,16 +12,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from build_report import char_count, extract_keywords, is_answered
-
-
-def dimension_stats(answers: dict, bank: dict):
-    out = []
-    for d in bank.get("dimensions", []):
-        qs = [q for q in bank.get("questions", []) if q["dimension"] == d["key"]]
-        done = sum(1 for q in qs if is_answered(answers.get(str(q["id"]), "")))
-        out.append({"key": d["key"], "label": d["label"], "done": done, "total": len(qs)})
-    return out
+from build_report import char_count, dimension_stats, extract_keywords, is_answered
 
 
 def main() -> int:

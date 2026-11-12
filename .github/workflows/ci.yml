@@ -15,11 +15,13 @@ jobs:
           python-version: "3.11"
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
-      - name: Validate SKILL.md (frontmatter, name, description)
+          node-version: "24"
+      - name: Validate SKILL.md (frontmatter, name, description, examples ≤ 3)
         run: python scripts/quick_validate.py .
-      - name: Check inline JS syntax in templates
+      - name: Check inline JS syntax in all templates
         run: python scripts/check_js.py
+      - name: End-to-end smoke test
+        run: python scripts/smoke_test.py
       - name: Build package zip (sync version + forward-slash paths)
         run: python scripts/package.py --output proust-questionnaire.zip
       - name: Verify zip structure
@@ -29,5 +31,6 @@ jobs:
           n = zipfile.ZipFile("proust-questionnaire.zip").namelist()
           assert n[0].startswith("proust-questionnaire/"), n[0]
           assert all("\\" not in x for x in n), "backslash found in zip path"
+          assert not any("/." in x for x in n), "dotfile leaked into zip"
           print("zip OK:", len(n), "entries, top:", n[0].split('/')[0])
           PY

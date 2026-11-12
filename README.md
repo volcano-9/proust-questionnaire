@@ -57,6 +57,7 @@ python scripts/build_history.py \
 | --- | --- |
 | `SKILL.md` | 触发条件、三阶段工作流、保存规则、输出规范与硬规则 |
 | `assets/questions.json` | 36 题题库、6 维度定义、填写提示 |
+| `assets/skip-words.json` | 作答判定口径单一来源（跳过词/短语），问卷页与脚本共用 |
 | `templates/questionnaire.html` | 问卷页模板（单文件、离线、本地草稿、保存引导） |
 | `templates/report.html` | 报告页模板（解读版 / 精简事实版共用，可打印为 PDF） |
 | `templates/history.html` | 历史查询与比对页模板（检索、展开、任意两条比对） |
@@ -85,12 +86,14 @@ python scripts/build_history.py \
 
 普鲁斯特问卷是文学性的自我问答传统，不是心理测评量表。报告与历史比对不构成医疗、心理、法律、投资或人事决策依据，也不评价变化的好坏。「主观报告」仅指基于原文的文学性观察，不等于可以脱离原文自由发挥。
 
-版本 1.2.2 · 需 Python 3.8+
+版本 1.3.0 · 需 Python 3.8+
 
 ## 开发 / 发布
 
 - **版本唯一来源**是仓库根目录的 `version.txt`。发布前改这一处即可，`scripts/package.py` 会把版本同步进 `SKILL.md` 与 `README.md` 再打包，避免三处版本号漂移。
-- 本地打包：`python scripts/package.py`，默认产出 `../proust-questionnaire-<版本>.zip`（zip 内路径为正斜杠，符合开放平台要求）。
-- CI：`.github/workflows/ci.yml` 在 push / PR 时自动跑 `quick_validate.py`（SKILL.md 校验）、`check_js.py`（模板内联 JS 语法）、以及打包并校验 zip 结构。
+- **其他版本号**：`assets/questions.json` 的 `version` 是**题库版本**（决定问卷草稿的 localStorage 键，改题必须递增，否则旧草稿会按题号串位）；`scripts/archive.py` 的 `ARCHIVE_VERSION` 是**存档 schema 版本**，与技能版本相互独立。
+- 本地打包：`python scripts/package.py`，默认产出 `../proust-questionnaire-<版本>.zip`（zip 内路径为正斜杠、不含点文件，符合开放平台要求）。
+- 本地自检：`python scripts/smoke_test.py` 会端到端跑一遍问卷 / 解读版报告 / 精简版报告 / 归档 / 比对 / 历史页，断言无 `{{占位}}` 残留、无外链。
+- CI：`.github/workflows/ci.yml` 在 push / PR 时自动跑 `quick_validate.py`（frontmatter、name、description、examples 各 ≤3）、`check_js.py`（模板全部内联脚本语法）、`smoke_test.py`，并打包校验 zip 结构。
 - 许可证：MIT（`LICENSE`）。
 

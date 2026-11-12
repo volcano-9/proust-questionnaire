@@ -24,23 +24,26 @@ def main():
     code = 0
     for html in sorted(TEMPLATES.glob("*.html")):
         text = html.read_text(encoding="utf-8")
-        m = re.search(r"<script>(.*?)</script>", text, re.S)
-        if not m:
+        # 检查全部 <script> 块，而不是只取第一个，避免多脚本模板漏检。
+        blocks = re.findall(r"<script[^>]*>(.*?)</script>", text, re.S)
+        if not blocks:
             print(f"no <script> in {html.name}, skip")
             continue
-        js = re.sub(r"\{\{[^}]+\}\}", "0", m.group(1))
-        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as tf:
-            tf.write(js)
-            tmp = tf.name
-        try:
-            r = subprocess.run(["node", "--check", tmp], capture_output=True, text=True)
-            if r.returncode == 0:
-                print(f"OK   {html.name}")
-            else:
-                print(f"FAIL {html.name}\n{r.stderr}")
-                code = 1
-        finally:
-            Path(tmp).unlink(missing_ok=True)
+        for i, block in enumerate(blocks, 1):
+            js = re.sub(r"\{\{[^}]+\}\}", "0", block)
+            with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as tf:
+                tf.write(js)
+                tmp = tf.name
+            try:
+                r = subprocess.run(["node", "--check", tmp], capture_output=True, text=True)
+                label = html.name if len(blocks) == 1 else f"{html.name}#{i}"
+                if r.returncode == 0:
+                    print(f"OK   {label}")
+                else:
+                    print(f"FAIL {label}\n{r.stderr}")
+                    code = 1
+            finally:
+                Path(tmp).unlink(missing_ok=True)
     return code
 
 

@@ -106,7 +106,7 @@ button.danger:hover{border-color:#c0392b;color:#c0392b}
 
 <div class="progress-card">
   <div class="progress-top"><strong>填写进度</strong><span id="progress-text">0 / 36</span></div>
-  <div class="track"><div class="fill" id="progress-fill"></div></div>
+  <div class="track" id="progress-track" role="progressbar" aria-label="填写进度" aria-valuemin="0" aria-valuemax="36" aria-valuenow="0"><div class="fill" id="progress-fill"></div></div>
   <div class="save-state" id="save-state">输入后自动暂存</div>
 </div>
 
@@ -152,8 +152,9 @@ button.danger:hover{border-color:#c0392b;color:#c0392b}
 
 <script>
 const DATA = {{QUESTIONS_JSON}};
+const SKIP_DATA = {{SKIP_JSON}};
 const KEY = 'proust-answers-' + (DATA.version || '1');
-const SKIP = new Set(['', '暂无', '无', '没有', '不方便回答', '不便回答', '不想回答', '不想说', '略过', '跳过', '-', '—', 'N/A']);
+const SKIP = new Set(SKIP_DATA.words || []);
 
 function esc(s){return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function load(){try{return JSON.parse(localStorage.getItem(KEY) || '{}') || {};}catch(e){return {};}}
@@ -162,7 +163,7 @@ let lastSaveAt = null;
 function save(a){try{localStorage.setItem(KEY, JSON.stringify(a));}catch(e){toast('本地存储不可用，请及时导出答案');}
   lastSaveAt = new Date(); updateSaveState();}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(window.__tt);window.__tt=setTimeout(()=>t.classList.remove('show'),2200);}
-const SKIP_PHRASES = ['不方便回答','不便回答','不想回答','不想说','略过','跳过','先留空'];
+const SKIP_PHRASES = SKIP_DATA.phrases || [];
 function isAnswered(v){
   const t = String(v == null ? '' : v).trim();
   if (SKIP.has(t)) return false;
@@ -197,12 +198,12 @@ function render(){
       + '<div class="charcount" id="cc-' + q.id + '"></div>'
       + '</div>').join('');
     return '<section class="group" data-dim="' + d.key + '">'
-      + '<div class="group-head" role="button" tabindex="0" aria-expanded="true">'
+      + '<div class="group-head" role="button" tabindex="0" aria-expanded="true" aria-controls="wrap-' + d.key + '">'
       + '<h2><span class="idx">' + (i+1) + '</span>' + esc(d.label)
       + ' <span class="dim-count" id="dim-' + d.key + '">0/' + qs.length + '</span></h2>'
       + '<p>' + esc(d.hint || '') + ' · ' + qs.length + ' 题</p>'
       + '<span class="caret">▾</span>'
-      + '</div><div class="qa-wrap">' + body + '</div></section>';
+      + '</div><div class="qa-wrap" id="wrap-' + d.key + '">' + body + '</div></section>';
   }).join('');
   root.querySelectorAll('.group-head').forEach(h => {
     const toggle = () => {
@@ -234,6 +235,8 @@ function updateProgress(){
   });
   document.getElementById('progress-text').textContent = done + ' / ' + total;
   document.getElementById('progress-fill').style.width = (done * 100 / total) + '%';
+  const track = document.getElementById('progress-track');
+  if (track){ track.setAttribute('aria-valuenow', String(done)); track.setAttribute('aria-valuemax', String(total)); }
   DATA.dimensions.forEach(d => {
     const el = document.getElementById('dim-' + d.key);
     if (el) el.textContent = (dimDone[d.key] || 0) + '/' + DATA.questions.filter(q => q.dimension === d.key).length;
@@ -278,6 +281,13 @@ document.getElementById('btn-import').onclick = () => document.getElementById('f
 document.getElementById('btn-next').onclick = () => {
   const ta = Array.from(document.querySelectorAll('#groups textarea')).find(el => !isAnswered(answers[el.dataset.id]));
   if (!ta){ toast('所有题目都已作答'); return; }
+  // 折叠组内的题在 display:none 里，先展开所属分组再滚动聚焦，否则按钮看似无反应。
+  const sec = ta.closest('.group');
+  if (sec && sec.classList.contains('collapsed')){
+    sec.classList.remove('collapsed');
+    const head = sec.querySelector('.group-head');
+    if (head) head.setAttribute('aria-expanded', 'true');
+  }
   ta.scrollIntoView({behavior:'smooth', block:'center'});
   ta.focus();
 };

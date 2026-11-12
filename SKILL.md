@@ -13,7 +13,7 @@ examples_en:
   - "Create a Proust Questionnaire for me to fill in"
   - "Generate a portrait report from my questionnaire answers"
   - "Show my past submissions and compare the last two"
-version: 1.2.2
+version: 1.3.0
 author: "郭志远"
 agent_created: true
 ---
@@ -46,6 +46,7 @@ agent_created: true
 | 路径 | 作用 |
 | --- | --- |
 | `assets/questions.json` | 36 题题库、6 个维度定义、每题填写提示 |
+| `assets/skip-words.json` | 作答判定口径的单一来源（跳过词与短语），问卷页与全部脚本共用 |
 | `templates/questionnaire.html` | 问卷页面模板，含保存引导卡片与 `{{QUESTIONS_JSON}}` / `{{GENERATED_AT}}` 占位 |
 | `templates/report.html` | 报告页面模板，含 `{{...}}` 系列占位；解读版与精简事实版共用 |
 | `templates/history.html` | 历史查询与比对页面模板，含 `{{HISTORY_JSON}}` 与 `{{GENERATED_AT}}` 占位 |
@@ -133,6 +134,7 @@ python scripts/archive.py save --archive "<工作区>/普鲁斯特档案" --answ
 ```bash
 python scripts/archive.py list   --archive "<工作区>/普鲁斯特档案" --json
 python scripts/archive.py show   --archive "<工作区>/普鲁斯特档案" --id <记录ID>
+python scripts/archive.py delete --archive "<工作区>/普鲁斯特档案" --id <记录ID>
 python scripts/archive.py search --archive "<工作区>/普鲁斯特档案" --query "海边"
 ```
 
@@ -144,7 +146,7 @@ python scripts/archive.py search --archive "<工作区>/普鲁斯特档案" --qu
 python scripts/archive.py compare --archive "<工作区>/普鲁斯特档案" --questions assets/questions.json --output "<工作区>/比对结果.json" --md "<工作区>/比对摘要.md"
 ```
 
-省略 `--a` / `--b` 时默认「上一次 → 最新一次」；用户点名两期时用 `--a <ID> --b <ID>` 指定。比对输出结构化 diff JSON 与 Markdown 摘要，表头显示两条记录的具体日期。
+省略 `--a` / `--b` 时默认「上一次 → 最新一次」；用户点名两期时用 `--a <ID> --b <ID>` 指定。只给 `--a` 时以该记录为基准、对照最新一条；只给 `--b` 时以该记录为对照、基准取其前一条。比对输出结构化 diff JSON 与 Markdown 摘要，表头显示两条记录的具体日期。
 
 差异类型固定为五种：`changed`（改写）、`new_answer`（新作答）、`removed_answer`（改为略过）、`same`（保持原样）、`both_skipped`（两次均未作答）。同时给出已作答题数、完成度、字数变化，各维度作答数变化，以及高频表达的新增 / 消失 / 保留。
 
@@ -164,7 +166,8 @@ python scripts/build_history.py --archive "<工作区>/普鲁斯特档案" --que
 - 比对只呈现**文本层面的差异**，不评价「变得更好 / 更差」，不推断变化原因、性格走向或心理状态，不输出趋势评级、人格变化结论或任何临床判断。
 - 未作答与主动略过在比对中单独标记，不得用空字符串伪装成「答案变短」。
 - 档案库为本地文件，不联网、不上传；生成的历史页为只读视图，不提供写入或删除入口。
-- 用户要求删除历史记录时，先列出待删记录 ID 与标签，说明不可恢复，取得明确确认后再操作。
+- 用户要求删除历史记录时，先列出待删记录 ID 与标签，说明不可恢复，取得明确确认后再用 `archive.py delete --id` 操作。
+- 归档时会自动检测重复：整份答案与已有记录一致则跳过并提示，确需重复存档时加 `--allow-duplicate`。
 
 ## 报告撰写的硬规则
 

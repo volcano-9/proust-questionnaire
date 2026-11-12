@@ -77,6 +77,29 @@ button.active{background:var(--accent-soft);border-color:var(--accent);color:var
 .printbar button{font-size:13px;padding:8px 15px;color:var(--muted)}
 @media(max-width:600px){.wrap{padding:20px 13px 60px}.hero,.card{padding:20px 17px}.stats{grid-template-columns:repeat(2,1fr)}.bar-row{grid-template-columns:88px 1fr 58px}}
 @media print{body{background:#fff}.wrap{max-width:100%;padding:0}.printbar,.controls,.filters,#search{display:none}.hero,.card{border:0;border-radius:0;padding:0 0 18px;margin:0 0 14px;box-shadow:none}.rec-body{display:block!important}.diff-item{page-break-inside:avoid}}
+@media (prefers-color-scheme: dark){
+  :root{--ink:#e8eaf0;--muted:#9aa1b2;--line:#2c2f3a;--bg:#16181f;--card:#1e2129;--accent:#7c92f0;--accent-soft:#262b40;--up:#e06a5f;--down:#4cc196;--warm:#d8a75a;--warm-soft:#2a2419}
+  body{background:var(--bg);color:var(--ink)}
+  .hero,.card{background:var(--card);border-color:var(--line)}
+  .note{background:#2a2419;border-left-color:#7a5a25;color:#d9b981}
+  .stat{background:#23262f;border-color:var(--line)}
+  .cmp-head{background:#23262f;border-color:var(--line)}
+  select,input[type=search]{background:#16181f;color:var(--ink)}
+  select:focus,input:focus{background:#1e2129}
+  button{background:#1e2129;color:var(--ink)}
+  .bar-track{background:#2c2f3a}
+  .kw-new{background:#1d2f27;color:#7fd3ab}.kw-gone{background:#33211f;color:#e59a91}.kw-kept{background:var(--accent-soft);color:#aab6f5}
+  .diff-item,.rec-body,.rec-qa{border-color:#262a34}
+  .badge.b-changed{background:#3a2c14;color:#e2b06a}.badge.b-new_answer{background:#1d2f27;color:#7fd3ab}.badge.b-removed_answer{background:#33211f;color:#e59a91}
+  .badge.b-same,.badge.b-both_skipped{background:#262a34;color:#9aa1b2}
+  .rec-head:hover{background:#23262f}
+  .rec-q{color:#9aa1b2}
+  .diff-line.a em{color:#e59a91}.diff-line.b em{color:#7fd3ab}
+  .empty-old{color:#6b7280}
+  .disclaimer{background:#1b1e26;color:#9aa1b2}
+  .disclaimer b{color:var(--ink)}
+  .muted{color:#7f879a}
+}
 </style>
 </head>
 <body>
@@ -100,8 +123,8 @@ button.active{background:var(--accent-soft);border-color:var(--accent);color:var
   <h2>历史比对</h2>
   <p class="desc">选择任意两条记录，A 为基准、B 为对照。默认取最近两次填写。</p>
   <div class="controls">
-    <div class="field"><label>记录 A（基准，较早）</label><select id="sel-a"></select></div>
-    <div class="field"><label>记录 B（对照，较新）</label><select id="sel-b"></select></div>
+    <div class="field"><label for="sel-a">记录 A（基准，较早）</label><select id="sel-a"></select></div>
+    <div class="field"><label for="sel-b">记录 B（对照，较新）</label><select id="sel-b"></select></div>
     <button class="primary" id="btn-compare">开始比对</button>
   </div>
   <div id="compare-result"></div>
@@ -110,7 +133,7 @@ button.active{background:var(--accent-soft);border-color:var(--accent);color:var
 <section class="card">
   <h2>历史记录查询</h2>
   <p class="desc">按标签或答案内容检索；点击任一条展开完整答案。</p>
-  <input type="search" id="search" placeholder="输入关键词，例如「海边」「父亲」「安静」…">
+  <input type="search" id="search" aria-label="按标签或答案内容检索历史记录" placeholder="输入关键词，例如「海边」「父亲」「安静」…">
   <p class="tagline" id="search-info"></p>
   <div id="record-list"></div>
 </section>
@@ -261,7 +284,8 @@ function renderList(query){
   const rs = DATA.records.filter(r => {
     if (!q) return true;
     if (String(r.label).toLowerCase().indexOf(q) >= 0) return true;
-    return Object.values(r.answers).some(v => String(v).toLowerCase().indexOf(q) >= 0);
+    // 只搜已作答文本，避免「暂无 / 略过」等跳过词把整库都刷成命中。
+    return r.answeredIds.some(id => String(r.answers[String(id)] || '').toLowerCase().indexOf(q) >= 0);
   });
   document.getElementById('search-info').textContent = q
     ? '命中 ' + rs.length + ' / ' + DATA.records.length + ' 条记录' : '共 ' + DATA.records.length + ' 条记录，按时间正序';

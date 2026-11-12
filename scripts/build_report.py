@@ -19,13 +19,31 @@ from collections import OrderedDict
 from datetime import date
 from pathlib import Path
 
-SKIP_WORDS = {
+# 作答判定口径的唯一来源：assets/skip-words.json。
+# 问卷页 JS、archive.py、build_history.py 全部经由这里（或注入的同一份 JSON）判定，
+# 避免出现「页面算已答、报告算未答」的口径漂移。
+_DEFAULT_SKIP_WORDS = {
     "", "暂无", "无", "没有", "不方便回答", "不便回答", "不想回答",
     "不想说", "略过", "跳过", "不答", "-", "—", "--", "n/a", "N/A", "na",
 }
-SKIP_PHRASES = (
-    "不方便回答", "不便回答", "不想回答", "不想说", "略过", "跳过", "先留空", "留空吧",
+_DEFAULT_SKIP_PHRASES = (
+    "不方便回答", "不便回答", "不想回答", "不想说", "略过", "跳过", "先留空", "留空吧", "不答",
 )
+
+
+def _load_skip_criteria():
+    path = Path(__file__).resolve().parent.parent / "assets" / "skip-words.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        words = set(data["words"])
+        phrases = tuple(data["phrases"])
+        return words, phrases
+    except (OSError, KeyError, TypeError, json.JSONDecodeError):
+        return set(_DEFAULT_SKIP_WORDS), _DEFAULT_SKIP_PHRASES
+
+
+SKIP_WORDS, SKIP_PHRASES = _load_skip_criteria()
+
 STOP_CHARS = set(
     "的了是在我有你他她它们就都很最一个什么这那会能要把被给与之其可"
     "以因为所从到时候里上下中小多少好还又再更比让使对于并且如若虽然"
@@ -86,42 +104,68 @@ def extract_keywords(texts, limit=12):
     return picked
 
 
+def dimension_stats(answers: dict, bank: dict):
+    """Per-dimension answered/total counts. Single implementation shared by
+    archive.py and build_history.py (they import it instead of re-implementing)."""
+    out = []
+    for d in bank.get("dimensions", []):
+        qs = [q for q in bank.get("questions", []) if q["dimension"] == d["key"]]
+        done = sum(1 for q in qs if is_answered(answers.get(str(q["id"]), "")))
+        out.append({"key": d["key"], "label": d["label"], "done": done, "total": len(qs)})
+    return out
+
+
 def inline_md(text: str) -> str:
     safe = html_lib.escape(text)
     return re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", safe)
 
 
 def md_to_html(md: str) -> str:
-    out, in_list = [], False
+    """Minimal Markdown renderer for insight drafts.
+
+    Supports H1–H3, paragraphs, unordered lists and ordered lists. Tables and
+    other block syntax are intentionally not rendered; references/analysis-framework.md
+    tells the writer to stick to headings + paragraphs + lists.
+    """
+    out = []
+    list_state = None  # None | "ul" | "ol"
+
+    def close_list():
+        nonlocal list_state
+        if list_state:
+            out.append(f"</{list_state}>")
+            list_state = None
+
     for raw in md.splitlines():
         line = raw.rstrip()
         if not line.strip():
-            if in_list:
-                out.append("</ul>")
-                in_list = False
+            close_list()
             continue
         if line.startswith("### "):
-            if in_list:
-                out.append("</ul>")
-                in_list = False
+            close_list()
             out.append(f"<h4>{inline_md(line[4:])}</h4>")
         elif line.startswith("## "):
-            if in_list:
-                out.append("</ul>")
-                in_list = False
+            close_list()
             out.append(f"<h3>{inline_md(line[3:])}</h3>")
-        elif line.startswith("- ") or line.startswith("* "):
-            if not in_list:
+        elif line.startswith("# "):
+            close_list()
+            out.append(f"<h3>{inline_md(line[2:])}</h3>")
+        elif re.match(r"^\s*[-*]\s+", line):
+            if list_state != "ul":
+                close_list()
                 out.append("<ul>")
-                in_list = True
-            out.append(f"<li>{inline_md(line[2:])}</li>")
+                list_state = "ul"
+            out.append(f"<li>{inline_md(re.sub(r'^\s*[-*]\s+', '', line))}</li>")
+        elif re.match(r"^\s*\d+\.\s+", line):
+            if list_state != "ol":
+                close_list()
+                out.append("<ol>")
+                list_state = "ol"
+            out.append(f"<li>{inline_md(re.sub(r'^\s*\d+\.\s+', '', line))}</li>")
         else:
-            if in_list:
-                out.append("</ul>")
-                in_list = False
+            close_list()
             out.append(f"<p>{inline_md(line)}</p>")
-    if in_list:
-        out.append("</ul>")
+    close_list()
     return "\n".join(out)
 
 
@@ -285,6 +329,7 @@ def main() -> int:
         "{{GENERATED_AT}}": date.today().isoformat(),
         "{{ANSWERED}}": str(answered),
         "{{TOTAL}}": str(total),
+        "{{DIM_COUNT}}": str(len(dimensions)),
         "{{RATE}}": str(rate),
         "{{CHAR_COUNT}}": str(chars),
         "{{NOTE}}": html_lib.escape(report_note),

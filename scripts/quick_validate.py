@@ -8,6 +8,30 @@ import os
 import re
 from pathlib import Path
 
+def count_list_items(frontmatter, key):
+    """Count top-level `- ` items under a `key:` block (e.g. examples_zh)."""
+    lines = frontmatter.splitlines()
+    count = 0
+    in_block = False
+    base_indent = 0
+    for line in lines:
+        if re.match(rf"^{re.escape(key)}\s*:", line):
+            in_block = True
+            base_indent = len(line) - len(line.lstrip())
+            continue
+        if not in_block:
+            continue
+        stripped = line.strip()
+        if not stripped:
+            continue
+        indent = len(line) - len(line.lstrip())
+        if indent <= base_indent and not stripped.startswith("-"):
+            break  # 离开该 block
+        if stripped.startswith("- "):
+            count += 1
+    return count
+
+
 def validate_skill(skill_path):
     """Basic validation of a skill"""
     skill_path = Path(skill_path)
@@ -17,8 +41,8 @@ def validate_skill(skill_path):
     if not skill_md.exists():
         return False, "SKILL.md not found"
     
-    # Read and validate frontmatter
-    content = skill_md.read_text()
+    # Read and validate frontmatter (normalise CRLF so the regex works cross-platform)
+    content = skill_md.read_text(encoding='utf-8').replace('\r\n', '\n').replace('\r', '\n')
     if not content.startswith('---'):
         return False, "No YAML frontmatter found"
     
@@ -52,6 +76,12 @@ def validate_skill(skill_path):
         # Check for angle brackets
         if '<' in description or '>' in description:
             return False, "Description cannot contain angle brackets (< or >)"
+
+    # examples_zh / examples_en 各最多 3 条（开放平台解析上限，超出会导致上传解析失败）
+    for key in ("examples_zh", "examples_en"):
+        n = count_list_items(frontmatter, key)
+        if n > 3:
+            return False, f"{key} has {n} examples; at most 3 allowed"
 
     return True, "Skill is valid!"
 

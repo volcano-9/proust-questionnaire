@@ -38,17 +38,28 @@ def main() -> int:
         return 1
 
     html = tpath.read_text(encoding="utf-8")
-    if "{{QUESTIONS_JSON}}" not in html:
-        print("ERROR: template is missing the {{QUESTIONS_JSON}} placeholder", file=sys.stderr)
-        return 1
+    for ph in ("{{QUESTIONS_JSON}}", "{{SKIP_JSON}}"):
+        if ph not in html:
+            print(f"ERROR: template is missing the {ph} placeholder", file=sys.stderr)
+            return 1
 
     payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     payload = payload.replace("</", "<\\/").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
     html = html.replace("{{QUESTIONS_JSON}}", payload)
+
+    # 作答判定口径：与 Python 脚本共用 assets/skip-words.json，避免页面/报告判定不一致。
+    skip_path = Path(__file__).resolve().parent.parent / "assets" / "skip-words.json"
+    try:
+        skip_data = json.loads(skip_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        skip_data = {"words": [], "phrases": []}
+    skip_json = json.dumps(skip_data, ensure_ascii=False, separators=(",", ":"))
+    html = html.replace("{{SKIP_JSON}}", skip_json)
+
     html = html.replace("{{GENERATED_AT}}", date.today().isoformat())
     html = html.replace("{{TITLE}}", str(data.get("title", "普鲁斯特问卷")))
 
-    if any(p in html for p in ("{{QUESTIONS_JSON}}", "{{GENERATED_AT}}", "{{TITLE}}")):
+    if any(p in html for p in ("{{QUESTIONS_JSON}}", "{{SKIP_JSON}}", "{{GENERATED_AT}}", "{{TITLE}}")):
         print("ERROR: unresolved placeholder in template", file=sys.stderr)
         return 1
 

@@ -23,6 +23,23 @@ EXCLUDE_FILES = {
     "scripts/package.py",
     "scripts/quick_validate.py",
     "scripts/check_js.py",
+    "scripts/smoke_test.py",
+}
+# 发布包必须包含的文件；缺任何一个都说明包不完整，直接失败而不是打出一个"成功"的残包。
+REQUIRED_FILES = {
+    "SKILL.md",
+    "README.md",
+    "LICENSE",
+    "assets/questions.json",
+    "assets/skip-words.json",
+    "templates/questionnaire.html",
+    "templates/report.html",
+    "templates/history.html",
+    "scripts/build_questionnaire.py",
+    "scripts/build_report.py",
+    "scripts/archive.py",
+    "scripts/build_history.py",
+    "references/analysis-framework.md",
 }
 
 
@@ -44,6 +61,11 @@ def sync_readme(version):
 
 def build_zip(out_path):
     version = read_version()
+
+    missing = sorted(f for f in REQUIRED_FILES if not (SKILL_ROOT / f).is_file())
+    if missing:
+        raise SystemExit("ERROR: missing required files: " + ", ".join(missing))
+
     sync_skill_md(version)
     sync_readme(version)
     out_path = Path(out_path) if out_path else (SKILL_ROOT.parent / f"proust-questionnaire-{version}.zip")
@@ -56,7 +78,10 @@ def build_zip(out_path):
                 continue
             rel = f.relative_to(SKILL_ROOT)
             rel_str = str(rel).replace("\\", "/")
-            if rel.parts[0] in EXCLUDE_DIRS or rel_str in EXCLUDE_FILES or rel.name == ".DS_Store":
+            # 跳过所有点文件/点目录（.git、.github、.gitattributes、.gitignore、.DS_Store 等）
+            if any(part.startswith(".") for part in rel.parts):
+                continue
+            if rel.parts[0] in EXCLUDE_DIRS or rel_str in EXCLUDE_FILES:
                 continue
             arc = (SKILL_ROOT.name + "/" + str(rel)).replace("\\", "/")
             z.write(f, arc)
