@@ -155,13 +155,16 @@ def md_to_html(md: str) -> str:
                 close_list()
                 out.append("<ul>")
                 list_state = "ul"
-            out.append(f"<li>{inline_md(re.sub(r'^\s*[-*]\s+', '', line))}</li>")
+            # 先算好再放进 f-string：Python 3.11 的 f-string 表达式内不允许反斜杠。
+            item = re.sub(r"^\s*[-*]\s+", "", line)
+            out.append(f"<li>{inline_md(item)}</li>")
         elif re.match(r"^\s*\d+\.\s+", line):
             if list_state != "ol":
                 close_list()
                 out.append("<ol>")
                 list_state = "ol"
-            out.append(f"<li>{inline_md(re.sub(r'^\s*\d+\.\s+', '', line))}</li>")
+            item = re.sub(r"^\s*\d+\.\s+", "", line)
+            out.append(f"<li>{inline_md(item)}</li>")
         else:
             close_list()
             out.append(f"<p>{inline_md(line)}</p>")

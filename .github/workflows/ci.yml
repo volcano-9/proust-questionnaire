@@ -8,11 +8,16 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    # README 承诺 Python 3.8+；跨版本跑可拦截「本地 3.13 能过、3.11 语法报错」这类问题。
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -23,8 +28,10 @@ jobs:
       - name: End-to-end smoke test
         run: python scripts/smoke_test.py
       - name: Build package zip (sync version + forward-slash paths)
+        if: matrix.python-version == '3.11'
         run: python scripts/package.py --output proust-questionnaire.zip
       - name: Verify zip structure
+        if: matrix.python-version == '3.11'
         run: |
           python - <<'PY'
           import zipfile
