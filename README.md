@@ -95,5 +95,6 @@ python scripts/build_history.py \
 - 本地打包：`python scripts/package.py`，默认产出 `../proust-questionnaire-<版本>.zip`（zip 内路径为正斜杠、不含点文件，符合开放平台要求）。
 - 本地自检：`python scripts/smoke_test.py` 会端到端跑一遍问卷 / 解读版报告 / 精简版报告 / 归档 / 比对 / 历史页，断言无 `{{占位}}` 残留、无外链。
 - CI：`.github/workflows/ci.yml` 在 push / PR 时自动跑 `quick_validate.py`（frontmatter、name、description、examples 各 ≤3）、`check_js.py`（模板全部内联脚本语法）、`smoke_test.py`，并打包校验 zip 结构。
+- **技能图标**：仓库根的 `_icon.png`（512×512 PNG）仅用于 GitHub 展示，**不打包进 zip**。图标在开放平台后台单独上传，官方 frontmatter 字段表也没有 `icon` 字段。可直接上传的同款文件为 `outputs/普鲁斯特问卷_图标.png`；另有纯图形版 `outputs/普鲁斯特问卷_图标_纯图形.png`，适合后台把图标缩得很小、英文标题看不清时使用。
 - 许可证：MIT（`LICENSE`）。
 

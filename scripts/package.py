@@ -20,6 +20,7 @@ README_MD = SKILL_ROOT / "README.md"
 EXCLUDE_DIRS = {".git", ".github", "__pycache__"}
 EXCLUDE_FILES = {
     "version.txt",
+    "_icon.png",
     "scripts/package.py",
     "scripts/quick_validate.py",
     "scripts/check_js.py",
