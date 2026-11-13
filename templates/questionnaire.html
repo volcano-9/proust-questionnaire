@@ -159,9 +159,17 @@ const SKIP = new Set(SKIP_DATA.words || []);
 function esc(s){return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function load(){try{return JSON.parse(localStorage.getItem(KEY) || '{}') || {};}catch(e){return {};}}
 let lastSaveAt = null;
+// 打开页面时探测一次本地存储是否可用，避免等到用户输入时才发现、也避免反复弹提示。
+let storageOK = (function(){
+  try{ const k = '__proust_probe__'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; }
+  catch(e){ return false; }
+})();
 
-function save(a){try{localStorage.setItem(KEY, JSON.stringify(a));}catch(e){toast('本地存储不可用，请及时导出答案');}
-  lastSaveAt = new Date(); updateSaveState();}
+function save(a){
+  try{ localStorage.setItem(KEY, JSON.stringify(a)); storageOK = true; }
+  catch(e){ storageOK = false; }
+  lastSaveAt = new Date(); updateSaveState();
+}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(window.__tt);window.__tt=setTimeout(()=>t.classList.remove('show'),2200);}
 const SKIP_PHRASES = SKIP_DATA.phrases || [];
 function isAnswered(v){
@@ -176,6 +184,8 @@ function updateSaveState(done){
   const el = document.getElementById('save-state');
   if (!el) return;
   const count = (done != null) ? done : DATA.questions.filter(q => isAnswered(answers[q.id])).length;
+  // 暂存不可用时只在状态栏静态提示，不弹窗、不打断输入，也不谎报「已自动暂存」。
+  if (!storageOK){ el.classList.remove('ok'); el.textContent = '暂存不可用 · 请导出答案'; return; }
   if (!count){ el.classList.remove('ok'); el.textContent = '输入后自动暂存'; return; }
   el.classList.add('ok');
   if (!lastSaveAt){ el.textContent = '已载入上次草稿 · ' + count + ' 题'; return; }
