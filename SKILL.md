@@ -13,7 +13,7 @@ examples_en:
   - "Create a Proust Questionnaire for me to fill in"
   - "Generate a portrait report from my questionnaire answers"
   - "Show my past submissions and compare the last two"
-version: 1.3.0
+version: 1.3.1
 author: "郭志远"
 agent_created: true
 ---
