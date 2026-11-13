@@ -184,13 +184,12 @@ function updateSaveState(done){
   const el = document.getElementById('save-state');
   if (!el) return;
   const count = (done != null) ? done : DATA.questions.filter(q => isAnswered(answers[q.id])).length;
-  // 暂存不可用时只在状态栏静态提示，不弹窗、不打断输入，也不谎报「已自动暂存」。
+  // 暂存不可用时只在状态栏静态提示，不弹窗、不打断输入，也不误报保存成功。
   if (!storageOK){ el.classList.remove('ok'); el.textContent = '暂存不可用 · 请导出答案'; return; }
   if (!count){ el.classList.remove('ok'); el.textContent = '输入后自动暂存'; return; }
   el.classList.add('ok');
   if (!lastSaveAt){ el.textContent = '已载入上次草稿 · ' + count + ' 题'; return; }
-  const t = lastSaveAt.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'});
-  el.textContent = '已自动暂存 · ' + t;
+  el.textContent = '为您持续保存中';
 }
 
 function render(){
